@@ -1,0 +1,5 @@
+packages:
+  ./
+
+package bluesky-stats
+  tests: True

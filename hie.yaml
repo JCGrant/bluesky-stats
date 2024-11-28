@@ -1,0 +1,16 @@
+cradle:
+  multi:
+    # - path: "ignore/"
+    #   config: {cradle: {none: }}
+
+    - path: "src"
+      config: {cradle: {cabal: {component: "lib:bluesky-stats"}}}
+
+    - path: "app"
+      config: {cradle: {cabal: {component: "bluesky-stats:bluesky-stats-exe"}}}
+
+    - path: "test"
+      config: {cradle: {cabal: {component: "bluesky-stats:bluesky-stats-test"}}}
+
+    - path: "bench"
+      config: {cradle: {cabal: {component: "bluesky-stats:bluesky-stats-bench"}}}
