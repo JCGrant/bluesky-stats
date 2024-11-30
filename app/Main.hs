@@ -10,9 +10,12 @@
 
 {-# HLINT ignore "Use newtype instead of data" #-}
 
+import Control.Concurrent (threadDelay)
 import Control.Monad.Trans.Resource (runResourceT)
+import Data.String (IsString (fromString))
 import Database.Persist.Sql
 import Lib
+import Network.Wai.EventSource (ServerEvent (ServerEvent), eventSourceAppIO)
 import Yesod
 
 data App = App
@@ -23,6 +26,7 @@ mkYesod
   "App"
   [parseRoutes|
 /user/#Username UserR GET
+/user/#Username/live LiveR GET
 |]
 
 getUserR :: Username -> Handler Html
@@ -37,8 +41,10 @@ getUserR username = do
     Just user -> do
       followerCountEntries <- runDB $ selectList [FollowerCountEntryUserId ==. entityKey user] [Desc FollowerCountEntryTimestamp]
       defaultLayout $ do
+        setTitle $ toHtml username <> "'s profile"
         [whamlet|
-          <p>#{username}
+          <h1>#{username}
+          <p>Live follower count: <span id="live-follower-count">Fetching...</span>
           <table>
             <tr>
               <th>Count
@@ -48,6 +54,27 @@ getUserR username = do
                 <td>#{count}
                 <td>#{formatUTCTime timestamp}
         |]
+        toWidgetBody
+          [julius|
+            var eventSource = new EventSource("@{LiveR username}");
+            eventSource.onmessage = function(event) {
+              document.getElementById("live-follower-count").innerText = event.data;
+            };
+            eventSource.onerror = function(event) {
+              console.error(event);
+            };
+          |]
+
+getLiveR :: Username -> Handler ()
+getLiveR username = do
+  let generateEvent = do
+        threadDelay $ 1000000 * 5 -- 5 seconds
+        mProfile <- liftIO $ getProfile username
+        case mProfile of
+          Left e -> return $ ServerEvent (Just "error") Nothing [fromString $ show e]
+          Right GetProfileResponse {followersCount} -> do
+            return $ ServerEvent (Just "message") Nothing [fromString $ show followersCount]
+  sendWaiApplication $ eventSourceAppIO generateEvent
 
 instance Yesod App where
   makeSessionBackend _ = return Nothing -- no session needed
