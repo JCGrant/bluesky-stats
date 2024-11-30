@@ -2,13 +2,13 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# HLINT ignore "Use newtype instead of data" #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
-
-{-# HLINT ignore "Use newtype instead of data" #-}
 
 import Control.Concurrent (threadDelay)
 import Control.Monad.Trans.Resource (runResourceT)
@@ -16,34 +16,63 @@ import Data.String (IsString (fromString))
 import Database.Persist.Sql
 import Lib
 import Network.Wai.EventSource (ServerEvent (ServerEvent), eventSourceAppIO)
+import StaticFiles ()
 import Text.Julius (RawJS (rawJS))
 import Yesod
+import Yesod.Static (Static, static)
 
 runIntervalSeconds :: Int
 runIntervalSeconds = 5
 
 data App = App
-  { appConnectionPool :: ConnectionPool
+  { appConnectionPool :: ConnectionPool,
+    appStatic :: Static
   }
 
 mkYesod
   "App"
   [parseRoutes|
+/static StaticR Static appStatic
 /user/#Username UserR GET
 /user/#Username/live LiveR GET
 |]
 
 getUserR :: Username -> Handler Html
 getUserR username = do
-  mUser <- runDB $ do
-    mUserFromDB <- getBy $ UniqueUsername username
-    case mUserFromDB of
-      Nothing -> insertUserFromBlueSky username
-      Just user -> return $ Just user
-  case mUser of
+  eProfile <- liftIO $ getProfile username
+  mUserFromDB <- runDB $ getBy $ UniqueUsername username
+  mData <- case (mUserFromDB, eProfile) of
+    -- Can't find user in DB or Bluesky
+    -- Return 404
+    (Nothing, Left _) -> return Nothing
+    -- Can't find user in DB, but found on Bluesky
+    -- Add new user to database, and then render as normal
+    (Nothing, Right profile@GetProfileResponse {followersCount}) -> do
+      user <- runDB $ insertUser username followersCount
+      return $ Just (user, profile)
+    -- Found user in DB, but can't find in Bluesky
+    -- A rare occurrence, the user probably changed their username, or deleted their Bluesky account
+    -- Render the database values with dummy values from Bluesky
+    (Just user, Left _) ->
+      return $
+        Just
+          ( user,
+            GetProfileResponse
+              { displayName = "Unknown",
+                avatar = "/static/default-avatar.jpg",
+                followersCount = 0,
+                followsCount = 0,
+                postsCount = 0
+              }
+          )
+    -- Found user in DB and Bluesky
+    -- Render as normal
+    (Just user, Right profile) -> return $ Just (user, profile)
+
+  case mData of
     Nothing -> notFound
-    Just user -> do
-      followerCountEntries <- runDB $ selectList [FollowerCountEntryUserId ==. entityKey user] [Desc FollowerCountEntryTimestamp]
+    Just (Entity userId _, GetProfileResponse {displayName, avatar, followersCount, followsCount, postsCount}) -> do
+      followerCountEntries <- runDB $ selectList [FollowerCountEntryUserId ==. userId] [Desc FollowerCountEntryTimestamp]
       defaultLayout $ do
         setTitle $ "Bluesky Stats | " <> toHtml username <> "'s follower count"
         toWidgetHead
@@ -60,7 +89,21 @@ getUserR username = do
         [whamlet|
           <div class="flex flex-col gap-4 p-4">
             <h1 class="text-3xl font-bold">Bluesky Stats
-            <h2 class="text-2xl font-bold">#{username}'s follower count
+            <div class="flex gap-4">
+              <img src="#{avatar}" class="w-28 h-28 rounded-full">
+              <div class="flex flex-col">
+                <h2 class="text-2xl font-bold">#{username}'s follower count
+                <p class="text-xl">#{displayName}
+                <div class="flex gap-4">
+                  <div class="flex flex-col items-center">
+                    <p>Followers
+                    <p class="font-bold">#{followersCount}
+                  <div class="flex flex-col items-center">
+                    <p>Following
+                    <p class="font-bold">#{followsCount}
+                  <div class="flex flex-col items-center">
+                    <p>Posts
+                    <p class="font-bold">#{postsCount}
             <p>Live follower count: <span id="live-follower-count">Fetching...</span>
             <div class="w-full h-[320px]">
               <canvas id="live-follower-chart">
@@ -148,7 +191,8 @@ instance YesodPersist App where
 
 main :: IO ()
 main = do
-  pool <- createDbPool
-  runResourceT $ flip runSqlPool pool $ do
+  appConnectionPool <- createDbPool
+  runResourceT $ flip runSqlPool appConnectionPool $ do
     runMigration migrateAll
-  warp 3000 $ App pool
+  appStatic <- static "static"
+  warp 3000 App {..}

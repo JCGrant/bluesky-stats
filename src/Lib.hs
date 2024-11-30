@@ -70,18 +70,11 @@ insertFollowerCountEntry userId followerCount = do
   timestamp <- liftIO getCurrentTime
   insert_ $ FollowerCountEntry userId followerCount timestamp
 
-insertUserFromBlueSky :: (MonadIO m) => Username -> ReaderT SqlBackend m (Maybe (Entity User))
-insertUserFromBlueSky username = do
-  mProfile <- liftIO $ getProfile username
-  case mProfile of
-    Left e -> do
-      liftIO $ putStrLn $ "Failed to get profile for " <> show username <> ": " <> show e
-      return Nothing
-    Right GetProfileResponse {followersCount} -> do
-      newUserId <- insert $ User username
-      insertFollowerCountEntry newUserId followersCount
-      newUser <- getJustEntity newUserId
-      return $ Just newUser
+insertUser :: (MonadIO m) => Username -> Int -> ReaderT SqlBackend m (Entity User)
+insertUser username followersCount = do
+  newUserId <- insert $ User username
+  insertFollowerCountEntry newUserId followersCount
+  getJustEntity newUserId
 
 -- BlueSky API
 
@@ -92,15 +85,21 @@ getProfile (Username username) = do
   return $ getResponseBody response
 
 data GetProfileResponse = GetProfileResponse
-  { handle :: String,
-    followersCount :: Int
+  { displayName :: String,
+    avatar :: String,
+    followersCount :: Int,
+    followsCount :: Int,
+    postsCount :: Int
   }
 
 instance FromJSON GetProfileResponse where
   parseJSON = withObject "GetProfileResponse" $ \v ->
     GetProfileResponse
-      <$> v .: "handle"
+      <$> v .: "displayName"
+      <*> v .: "avatar"
       <*> v .: "followersCount"
+      <*> v .: "followsCount"
+      <*> v .: "postsCount"
 
 -- Formatting
 

@@ -26,6 +26,7 @@ common common-options
     , aeson
     , blaze-markup
     , yesod
+    , yesod-static
     , persistent
     , persistent-sqlite
     , persistent-postgresql
