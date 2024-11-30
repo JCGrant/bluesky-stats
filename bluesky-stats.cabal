@@ -21,7 +21,20 @@ extra-doc-files:
 --   location: git://github.com/FIXME/bluesky-stats.git
 
 common common-options
-  build-depends:    base >=4.9 && <5
+  build-depends:
+    , base >=4.9 && <5
+    , aeson
+    , blaze-markup
+    , yesod
+    , persistent
+    , persistent-sqlite
+    , persistent-postgresql
+    , resourcet
+    , monad-logger
+    , time
+    , transformers
+    , http-conduit
+    , wai-extra < 3.1.17
   default-language: Haskell2010
   ghc-options:
     -Wall -Wcompat -Widentities -Wincomplete-uni-patterns
@@ -32,37 +45,17 @@ library
   import:          common-options
   hs-source-dirs:  src
   exposed-modules: Lib
-  build-depends:
-    , containers
-    , mtl
 
-executable bluesky-stats-exe
+executable bluesky-stats-app
   import:         common-options
   hs-source-dirs: app
   main-is:        Main.hs
   build-depends:  bluesky-stats
   ghc-options:    -threaded -rtsopts -with-rtsopts=-N
 
-test-suite bluesky-stats-test
+executable bluesky-stats-agent
   import:         common-options
-  type:           exitcode-stdio-1.0
-  hs-source-dirs: test
-  main-is:        Spec.hs
-  build-depends:
-    , hspec
-    , HUnit
-    , bluesky-stats
-    , QuickCheck
-
-  ghc-options:    -threaded -rtsopts -with-rtsopts=-N
-
-benchmark bluesky-stats-bench
-  import:         common-options
-  type:           exitcode-stdio-1.0
-  hs-source-dirs: bench
+  hs-source-dirs: agent
   main-is:        Main.hs
-  build-depends:
-    , criterion
-    , bluesky-stats
-
+  build-depends:  bluesky-stats
   ghc-options:    -threaded -rtsopts -with-rtsopts=-N

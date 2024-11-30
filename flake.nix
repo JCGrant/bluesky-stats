@@ -32,6 +32,8 @@
                 hspkgs.hlint
                 hspkgs.ormolu
                 pkgs.bashInteractive
+                pkgs.zlib
+                pkgs.postgresql
               ];
             };
           };
