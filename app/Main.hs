@@ -70,11 +70,20 @@ getUserR username = do
                 <tr>
                   <th scope="col" class="px-6 py-3">Time
                   <th scope="col" class="px-6 py-3">Count
+                  <th scope="col" class="px-6 py-3">Change
               <tbody class="bg-slate-900">
-                $forall Entity _ (FollowerCountEntry _ count timestamp) <- followerCountEntries
+                $forall (Entity _ (FollowerCountEntry _ count timestamp), Entity _ (FollowerCountEntry _ prevCount _)) <- zip followerCountEntries $ drop 1 followerCountEntries
                   <tr class="border-t border-slate-800">
                     <td class="px-6 py-4">#{formatUTCTime timestamp}
                     <td class="px-6 py-4">#{count}
+                    <td class="px-6 py-4 font-bold">
+                      $if count == prevCount
+                        -
+                      $else
+                        $if count > prevCount
+                          <span class="text-green-500">+#{count - prevCount}
+                        $else
+                          <span class="text-red-500">#{count - prevCount}
         |]
         toWidgetBody
           [julius|
