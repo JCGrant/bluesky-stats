@@ -16,7 +16,11 @@ import Data.String (IsString (fromString))
 import Database.Persist.Sql
 import Lib
 import Network.Wai.EventSource (ServerEvent (ServerEvent), eventSourceAppIO)
+import Text.Julius (RawJS (rawJS))
 import Yesod
+
+runIntervalSeconds :: Int
+runIntervalSeconds = 5
 
 data App = App
   { appConnectionPool :: ConnectionPool
@@ -41,8 +45,12 @@ getUserR username = do
     Just user -> do
       followerCountEntries <- runDB $ selectList [FollowerCountEntryUserId ==. entityKey user] [Desc FollowerCountEntryTimestamp]
       defaultLayout $ do
-        setTitle $ toHtml username <> "'s profile"
-        toWidgetHead [hamlet|<script src="https://cdn.tailwindcss.com"></script>|]
+        setTitle $ "Bluesky Stats | " <> toHtml username <> "'s follower count"
+        toWidgetHead
+          [hamlet|
+          <script src="https://cdn.tailwindcss.com"></script>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        |]
         toWidgetHead
           [cassius|
             body
@@ -51,8 +59,12 @@ getUserR username = do
           |]
         [whamlet|
           <div class="flex flex-col gap-4 p-4">
-            <h1 class="text-3xl font-bold">#{username}'s Follower Count
+            <h1 class="text-3xl font-bold">Bluesky Stats
+            <h2 class="text-2xl font-bold">#{username}'s follower count
             <p>Live follower count: <span id="live-follower-count">Fetching...</span>
+            <div class="w-full h-[320px]">
+              <canvas id="live-follower-chart">
+            <h3 class="text-xl font-bold">Follower count history
             <table class="w-full text-left table-auto">
               <thead class="uppercase bg-slate-800">
                 <tr>
@@ -66,9 +78,38 @@ getUserR username = do
         |]
         toWidgetBody
           [julius|
+            const liveFollowerChart = new Chart(
+              document.getElementById("live-follower-chart"),
+              {
+                type: 'line',
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                },
+                data: {
+                  labels: [],
+                  datasets: [
+                    {
+                      label: 'Live Follower Count',
+                      data: [],
+                    }
+                  ]
+                }
+              }
+            );
+
+            let seconds = 0;
+
             const eventSource = new EventSource("@{LiveR username}");
             eventSource.onmessage = function(event) {
-              document.getElementById("live-follower-count").innerText = event.data;
+              const count = parseInt(event.data);
+              // Update Text
+              document.getElementById("live-follower-count").innerText = count;
+              // Update Chart
+              liveFollowerChart.data.labels.push(seconds);
+              seconds += #{rawJS (show runIntervalSeconds)};
+              liveFollowerChart.data.datasets[0].data.push(count);
+              liveFollowerChart.update();
             };
             eventSource.onerror = function(event) {
               console.error(event);
@@ -78,7 +119,7 @@ getUserR username = do
 getLiveR :: Username -> Handler ()
 getLiveR username = do
   let generateEvent = do
-        threadDelay $ 1000000 * 5 -- 5 seconds
+        threadDelay $ 1000000 * runIntervalSeconds -- 5 seconds
         mProfile <- liftIO $ getProfile username
         case mProfile of
           Left e -> return $ ServerEvent (Just "error") Nothing [fromString $ show e]
