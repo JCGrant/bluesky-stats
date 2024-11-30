@@ -5,9 +5,6 @@ run:
 	if [ -z ${TARGET} ]; then echo "TARGET is not set"; exit 1; fi
 	DB_CONNECTION_STRING="${DB_CONNECTION_STRING}" cabal run bluesky-stats-${TARGET}
 
-build:
-	cabal build
-
 docker-dev:
 	docker compose -f docker-compose.dev.yml up
 

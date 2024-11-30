@@ -20,14 +20,15 @@ RUN apt-get update && apt-get install -y \
   libpq-dev \
   && rm -rf /var/lib/apt/lists/*
 
+COPY bluesky-stats.cabal .
 RUN cabal update
+RUN cabal build --only-dependencies
 
 COPY app/ ./app
 COPY agent/ ./agent
 COPY src/ ./src
-COPY bluesky-stats.cabal .
 COPY Makefile .
 
-RUN make build
+RUN cabal build
 
 ENTRYPOINT ["make", "run"]
