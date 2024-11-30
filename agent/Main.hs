@@ -16,9 +16,9 @@ updateFollowerCount :: Entity User -> ReaderT SqlBackend (ResourceT IO) ()
 updateFollowerCount (Entity userId user) = do
   let Username username = userUsername user
   liftIO $ putStrLn $ "Updating follower count for " <> username
-  mProfile <- liftIO $ getProfile $ userUsername user
-  case mProfile of
-    Left e -> liftIO $ putStrLn $ "Failed to get profile for " <> username <> ": " <> show e
+  eProfile <- liftIO $ getProfile $ userUsername user
+  case eProfile of
+    Left _ -> return ()
     Right GetProfileResponse {followersCount} -> insertFollowerCountEntry userId followersCount
 
 main :: IO ()
