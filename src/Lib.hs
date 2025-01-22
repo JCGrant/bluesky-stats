@@ -20,7 +20,8 @@ import Control.Monad.Logger (runStderrLoggingT)
 import Control.Monad.Trans.Reader (ReaderT)
 import Data.Aeson (withObject)
 import Data.String (IsString (fromString))
-import Data.Time (UTCTime, defaultTimeLocale, formatTime, getCurrentTime)
+import Data.Time (UTCTime (utctDayTime), defaultTimeLocale, formatTime, getCurrentTime)
+import Data.Time.LocalTime (TimeOfDay (TimeOfDay), timeToTimeOfDay)
 import Database.Persist.Postgresql (ConnectionString, createPostgresqlPool)
 import Database.Persist.Sql
 import Network.HTTP.Simple
@@ -105,3 +106,8 @@ instance FromJSON GetProfileResponse where
 
 formatUTCTime :: UTCTime -> String
 formatUTCTime = formatTime defaultTimeLocale "%Y-%m-%d %H:00:00"
+
+isAtMidnight :: UTCTime -> Bool
+isAtMidnight time =
+  let (TimeOfDay hour _ _) = timeToTimeOfDay (utctDayTime time)
+   in hour == 0

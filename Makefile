@@ -19,3 +19,8 @@ docker-run:
 
 docker-push:
 	docker push jcgrant/bluesky-stats
+
+build-prod:
+	make docker-build
+	make docker-push
+	kubectl rollout restart deployment/bluesky-stats

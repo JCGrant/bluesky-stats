@@ -73,6 +73,7 @@ getUserR username = do
     Nothing -> notFound
     Just (Entity userId _, GetProfileResponse {displayName, avatar, followersCount, followsCount, postsCount}) -> do
       followerCountEntries <- runDB $ selectList [FollowerCountEntryUserId ==. userId] [Desc FollowerCountEntryTimestamp]
+      let dailyFollowerCountEntries = filter (\(Entity _ (FollowerCountEntry {followerCountEntryTimestamp})) -> isAtMidnight followerCountEntryTimestamp) followerCountEntries
       defaultLayout $ do
         setTitle $ "Bluesky Stats | " <> toHtml username <> "'s follower count"
         toWidgetHead
@@ -115,7 +116,7 @@ getUserR username = do
                   <th scope="col" class="px-6 py-3">Count
                   <th scope="col" class="px-6 py-3">Change
               <tbody class="bg-slate-900">
-                $forall (Entity _ (FollowerCountEntry _ count timestamp), Entity _ (FollowerCountEntry _ prevCount _)) <- zip followerCountEntries $ drop 1 followerCountEntries
+                $forall (Entity _ (FollowerCountEntry _ count timestamp), Entity _ (FollowerCountEntry _ prevCount _)) <- zip dailyFollowerCountEntries $ drop 1 dailyFollowerCountEntries
                   <tr class="border-t border-slate-800">
                     <td class="px-6 py-4">#{formatUTCTime timestamp}
                     <td class="px-6 py-4">#{count}
