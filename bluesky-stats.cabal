@@ -52,6 +52,7 @@ executable bluesky-stats-app
   import:         common-options
   hs-source-dirs: app
   main-is:        Main.hs
+  other-modules:  StaticFiles
   build-depends:  bluesky-stats
   ghc-options:    -threaded -rtsopts -with-rtsopts=-N
 

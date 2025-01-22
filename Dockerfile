@@ -27,6 +27,7 @@ RUN cabal build --only-dependencies
 COPY app/ ./app
 COPY agent/ ./agent
 COPY src/ ./src
+COPY static/ ./static
 COPY Makefile .
 
 RUN cabal build
